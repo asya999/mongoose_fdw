@@ -10,6 +10,8 @@ from dateutil.parser import parse
 
 from functools import partial
 
+import json
+
 dict_traverser = partial(reduce,
                          lambda x, y: x.get(y, {}) if type(x) == dict else x)
 
@@ -40,9 +42,10 @@ class Mongoose_fdw (ForeignDataWrapper):
 
         self.auth_db = options.get('auth_db', self.db_name)
 
-        self.c.userprofile.authenticate(self.user,
-                                        self.password,
-                                        source=self.auth_db)
+        if self.user:
+            self.c.userprofile.authenticate(self.user,
+                                            self.password,
+                                            source=self.auth_db)
 
         self.db = getattr(self.c, self.db_name)
         self.coll = getattr(self.db, self.collection_name)
@@ -50,6 +53,10 @@ class Mongoose_fdw (ForeignDataWrapper):
         # log2pg('cols: {}'.format(columns))
         self.fields = {col: {'formatter': coltype_formatter(coldef.type_name),
                              'path': col.split('.')} for (col, coldef) in columns.items()}
+
+        self.pipe = options.get('pipe')
+        if self.pipe:
+            self.pipe = json.loads(self.pipe)
 
     def build_spec(self, quals):
         Q = {}
@@ -82,9 +89,22 @@ class Mongoose_fdw (ForeignDataWrapper):
             fields['_id'] = False
 
         Q = self.build_spec(quals)
+
         # log2pg('spec: {}'.format(Q))
         # log2pg('fields: {}'.format(fields))
-        cur = self.coll.find(spec=Q, fields=fields, snapshot=True)
+
+        if self.pipe:
+            pipe = []
+            pipe.extend(self.pipe)
+            pipe.append( { "$match" : Q } )
+
+            cur = self.coll.aggregate(pipe)
+            if cur["ok"] != 1:
+                raise Exception(tojson(cur))
+            cur = cur["result"]
+        else:
+            cur = self.coll.find(spec=Q, fields=fields, snapshot=True)
+
         for doc in cur:
             yield {col: dict_traverser(self.fields[col]['path'], doc) for col in columns}
 
