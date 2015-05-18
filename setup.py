@@ -11,7 +11,7 @@ if __name__ == '__main__':
           description='An experimental Postgres fdw for MongoDB',
           url='http://github.com/dwa/mongoose_fdw',
           version='0.0.1',
-          install_requires=['pymongo',
+          install_requires=['pymongo>=2.8,<3.0',
                             'python-dateutil'],
           packages=['mongoose_fdw'],
           classifier=['Private :: Do Not Upload'])

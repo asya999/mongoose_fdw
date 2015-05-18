@@ -98,10 +98,7 @@ class Mongoose_fdw (ForeignDataWrapper):
             pipe.extend(self.pipe)
             pipe.append( { "$match" : Q } )
 
-            cur = self.coll.aggregate(pipe)
-            if cur["ok"] != 1:
-                raise Exception(tojson(cur))
-            cur = cur["result"]
+            cur = self.coll.aggregate(pipe, cursor={})
         else:
             cur = self.coll.find(spec=Q, fields=fields, snapshot=True)
 
