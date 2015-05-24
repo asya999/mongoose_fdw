@@ -13,7 +13,7 @@ from functools import partial
 import json
 
 dict_traverser = partial(reduce,
-                         lambda x, y: x.get(y, {}) if type(x) == dict else x)
+                         lambda x, y: x.get(y) if type(x) == dict else x)
 
 
 def coltype_formatter(coltype):
@@ -64,7 +64,8 @@ class Mongoose_fdw (ForeignDataWrapper):
         comp_mapper = {'>': '$gt',
                        '>=': '$gte',
                        '<=': '$lte',
-                       '<': '$lt'}
+                       '<': '$lt',
+                       '<>': '$ne'}
 
         for qual in quals:
             val_formatter = self.fields[qual.field_name]['formatter']
@@ -72,7 +73,7 @@ class Mongoose_fdw (ForeignDataWrapper):
             if qual.operator == '=':
                 Q[qual.field_name] = vform(qual.value)
 
-            elif qual.operator in ('>', '>=', '<=', '<'):
+            elif qual.operator in comp_mapper:
                 comp = Q.setdefault(qual.field_name, {})
                 comp[comp_mapper[qual.operator]] = vform(qual.value)
                 Q[qual.field_name] = comp
@@ -95,8 +96,8 @@ class Mongoose_fdw (ForeignDataWrapper):
 
         if self.pipe:
             pipe = []
+            if Q: pipe.append( { "$match" : Q } )
             pipe.extend(self.pipe)
-            pipe.append( { "$match" : Q } )
 
             cur = self.coll.aggregate(pipe, cursor={})
         else:
